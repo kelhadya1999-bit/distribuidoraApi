@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DistribuidoraApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eabceac6ac098435b60b2a4c0999fd873ddfb178")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3b76a40dc7392995d6147850133fa5b170b1b553")]
 [assembly: System.Reflection.AssemblyProductAttribute("DistribuidoraApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DistribuidoraApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
