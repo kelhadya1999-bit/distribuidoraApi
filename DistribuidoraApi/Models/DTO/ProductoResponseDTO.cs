@@ -6,7 +6,7 @@ namespace DistribuidoraApi.Models.DTO
     public class ProductoResponseDTO
     {
         public Guid Id { get; set; }
-        public string Codigo { get; set; } = string.Empty;
+        public string CodigoProducto { get; set; } = string.Empty;
         public string Nombre { get; set; } = string.Empty;
         public string? Descripcion { get; set; }
         public decimal PrecioVenta { get; set; }

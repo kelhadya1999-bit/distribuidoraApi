@@ -5,9 +5,9 @@ namespace DistribuidoraApi.Models.DTO
 {
     public class UpdateProductoRequest
     {
-        [Required(ErrorMessage = "El código es obligatorio.")]
-        [MaxLength(20, ErrorMessage = "El código no puede superar 20 caracteres.")]
-        public string CodigoProducto { get; set; } = string.Empty;
+        //[Required(ErrorMessage = "El código es obligatorio.")]
+        //[MaxLength(20, ErrorMessage = "El código no puede superar 20 caracteres.")]
+        //public string CodigoProducto { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "El nombre es obligatorio.")]
         [MaxLength(150)]
@@ -26,7 +26,7 @@ namespace DistribuidoraApi.Models.DTO
         public decimal StockMinimo { get; set; }
 
         [MaxLength(20)]
-        public string? CodigoCategoria { get; set; } = "GEN";
+        public string? CodigoCategoria { get; set;}= "GEN";
 
         [MaxLength(10)]
         public string? CodigoMedida { get; set; } = "UD";
