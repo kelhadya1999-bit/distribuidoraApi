@@ -1,6 +1,7 @@
 using DistribuidoraApi.Data;
 using Microsoft.EntityFrameworkCore;
 using DistribuidoraApi.Repositories;
+using DistribuidoraApi.Mapping;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -11,6 +12,9 @@ builder.Services.AddDbContext<DistribuidoraDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DistribuidoraConnectionString")));
 
 builder.Services.AddScoped<IProductoRepository, SQLProductoRepository>();
+
+builder.Services.AddAutoMapper(cfg => { }, typeof(AutoMapperProfile).Assembly);
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

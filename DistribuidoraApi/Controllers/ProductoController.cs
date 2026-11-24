@@ -1,4 +1,5 @@
-﻿using DistribuidoraApi.Data;
+﻿using AutoMapper;
+using DistribuidoraApi.Data;
 using DistribuidoraApi.Models.Domain;
 using DistribuidoraApi.Models.DTO;
 using DistribuidoraApi.Repositories;
@@ -15,10 +16,13 @@ namespace DistribuidoraApi.Controllers
         // Inyección de dependencias del contexto de base de datos DistribuidoraDbContext
 
         private readonly IProductoRepository _productoRepository;
+        private readonly IMapper _mapper;
         // Constructor del controlador que recibe el contexto de base de datos como parámetro
-        public ProductoController(IProductoRepository productoRepository)
+        //implementar el automapper para mapear entre el DTO y la entidad
+        public ProductoController(IProductoRepository productoRepository, IMapper mapper)
         {
             _productoRepository = productoRepository;
+            _mapper = mapper;
         }
 
         [HttpGet]
@@ -26,65 +30,53 @@ namespace DistribuidoraApi.Controllers
         {
             // Obtiene todos los productos de la base de datos utilizando el contexto de base de datos
             var productos = await _productoRepository.GetAllProductsAsync();
-            //mapear el un DTO de producto para no exponer la entidad directamente
-            var productoDTOs = productos.Select(p => new Models.DTO.ProductoResponseDTO
-            {
-                Id = p.Id,
-                CodigoProducto = p.CodigoProducto,
-                Nombre = p.Nombre,
-                Descripcion = p.Descripcion,
-                PrecioVenta = p.PrecioVenta,
-                StockActual = p.StockActual,
-                StockMinimo = p.StockMinimo,
-                Activo = p.Activo
-            }).ToList();
+
+            // Mapea la lista de productos de dominio a una lista de DTOs de salida utilizando AutoMapper
+            var productoDTOs = _mapper.Map<List<ProductoResponseDTO>>(productos);
+
             return Ok(productoDTOs);
         }
 
-        [HttpGet("{CodigoProducto}")]
-        public async Task<IActionResult> GetProductById([Required] string CodigoProducto)
+        [HttpGet("codigo/{codigoProducto}")]
+        public async Task<IActionResult> GetProductByCode(string codigoProducto)
         {
             // Validación del parámetro de entrada
-            if (CodigoProducto == string.Empty || CodigoProducto == null)
+            if (string.IsNullOrWhiteSpace(codigoProducto))
             {
                 return BadRequest("El código del producto no puede estar vacío.");
             }
+
+            // Normaliza el código igual que al guardarlo
+            var codigo = codigoProducto.Trim().ToUpperInvariant();
+
             // Busca el producto en la base de datos por su código
-            var producto = await _productoRepository.GetProductByCodigoAsync(CodigoProducto);
+            var producto = await _productoRepository.GetProductByCodigoAsync(codigo);
 
             // Si no se encuentra el producto, devuelve un 404 Not Found
             if (producto == null)
             {
-                return NotFound();
+                return NotFound($"No existe ningún producto con el código '{codigo}'.");
             }
-            //mapear el producto a un DTO de salida para no exponer la entidad directamente
-            var productoDTO = new Models.DTO.ProductoResponseDTO
-            {
-                CodigoProducto = producto.CodigoProducto,
-                Nombre = producto.Nombre,
-                Descripcion = producto.Descripcion,
-                PrecioVenta = producto.PrecioVenta,
-                StockActual = producto.StockActual,
-                StockMinimo = producto.StockMinimo,
-                Activo = producto.Activo
-            };
+
+            // Mapear el producto a un DTO de salida para no exponer la entidad directamente
+            var productoDTO = _mapper.Map<ProductoResponseDTO>(producto);
             return Ok(productoDTO);
         }
 
         // POST: api/producto
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] AddProductoRequestDTO request)
+        public async Task<IActionResult> Create([FromBody] AddProductoRequestDTO addProductoRequestDTO)
         {
-            // Normalizar códigos (mayúsculas, sin espacios) y aplicar valores por defecto
-            var codigo = request.CodigoProducto.Trim().ToUpperInvariant();
+            // Normalizar códigos y aplicar valores por defecto
+            var codigo = addProductoRequestDTO.CodigoProducto.Trim().ToUpperInvariant();
 
-            var codigoCategoria = string.IsNullOrWhiteSpace(request.CodigoCategoria)
+            var codigoCategoria = string.IsNullOrWhiteSpace(addProductoRequestDTO.CodigoCategoria)
                 ? "GEN"
-                : request.CodigoCategoria.Trim().ToUpperInvariant();
+                : addProductoRequestDTO.CodigoCategoria.Trim().ToUpperInvariant();
 
-            var codigoMedida = string.IsNullOrWhiteSpace(request.CodigoMedida)
+            var codigoMedida = string.IsNullOrWhiteSpace(addProductoRequestDTO.CodigoMedida)
                 ? "UD"
-                : request.CodigoMedida.Trim().ToUpperInvariant();
+                : addProductoRequestDTO.CodigoMedida.Trim().ToUpperInvariant();
 
             // Reglas de negocio
             if (await _productoRepository.GetProductByCodigoAsync(codigo) != null)
@@ -96,32 +88,23 @@ namespace DistribuidoraApi.Controllers
             if (await _productoRepository.GetUnidadMedidaAsync(codigoMedida) == null)
                 return BadRequest($"La unidad de medida '{codigoMedida}' no existe.");
 
-            // DTO de entrada → entidad
-            var producto = new Producto
-            {
-                Id = Guid.NewGuid(),
-                CodigoProducto = codigo,
-                Nombre = request.Nombre.Trim(),
-                Descripcion = request.Descripcion,
-                PrecioVenta = request.PrecioVenta,
-                PrecioCompra = request.PrecioCompra,
-                StockMinimo = request.StockMinimo,
-                StockActual = 0,
-                Activo = true,
-                CodigoCategoria = codigoCategoria,
-                CodigoMedida = codigoMedida
-            };
+            // DTO de entrada → entidad (AutoMapper) + valores normalizados
+            var productoDomainModel = _mapper.Map<Producto>(addProductoRequestDTO);
+            productoDomainModel.Id = Guid.NewGuid();
+            productoDomainModel.CodigoProducto = codigo;
+            productoDomainModel.Nombre = addProductoRequestDTO.Nombre.Trim();
+            productoDomainModel.CodigoCategoria = codigoCategoria;
+            productoDomainModel.CodigoMedida = codigoMedida;
 
-            await _productoRepository.AddProductAsync(producto);
-            
-            var productoDTO = ToDto(producto);
-            return CreatedAtAction(nameof(GetProductById),
-                new { codigoProducto = producto.CodigoProducto },
-                new { mensaje = "Se ha creado el producto", producto = productoDTO });
+            await _productoRepository.AddProductAsync(productoDomainModel);
+
+            // Entidad → DTO de salida
+            var productoDTO = _mapper.Map<ProductoResponseDTO>(productoDomainModel);
+            return CreatedAtAction(nameof(GetProductByCode), new { codigoProducto = productoDomainModel.CodigoProducto }, productoDTO);
         }
 
         [HttpPut("{codigoProducto}")]
-        public async Task<IActionResult> Update([Required] string codigoProducto, UpdateProductoRequest request)
+        public async Task<IActionResult> Update([Required] string codigoProducto, UpdateProductoRequest updateProductoRequest) 
         {
             //obtener el producto de la base de datos
             var productDomainModel = await _productoRepository.GetProductByCodigoAsync(codigoProducto);
@@ -131,36 +114,30 @@ namespace DistribuidoraApi.Controllers
                 return NotFound();
             }
             //comprobar si la categoria existe, si no existe devolver un 400
-            if(request.CodigoCategoria != null)
+            if(updateProductoRequest.CodigoCategoria != null)
             {
-                var categoria = await _productoRepository.GetCategoriaAsync(request.CodigoCategoria);
+                var categoria = await _productoRepository.GetCategoriaAsync(updateProductoRequest.CodigoCategoria);
                 if (categoria == null)
                 {
-                    return BadRequest($"La categoría '{request.CodigoCategoria}' no existe.");
+                    return BadRequest($"La categoría '{updateProductoRequest.CodigoCategoria}' no existe.");
                 }
             }
             //comprobar si la unidad de medida existe, si no existe devolver un 400
-            if (request.CodigoMedida != null)
+            if (updateProductoRequest.CodigoMedida != null)
             { 
-                var unidadMedida = await _productoRepository.GetUnidadMedidaAsync(request.CodigoMedida);
+                var unidadMedida = await _productoRepository.GetUnidadMedidaAsync(updateProductoRequest.CodigoMedida);
                 if (unidadMedida == null)
                 {
-                    return BadRequest($"La unidad de medida '{request.CodigoMedida}' no existe.");
+                    return BadRequest($"La unidad de medida '{updateProductoRequest.CodigoMedida}' no existe.");
                 }
             }
 
             //mapear dto a domain model
-            productDomainModel.Nombre = request.Nombre;
-            productDomainModel.Descripcion = request.Descripcion;
-            productDomainModel.PrecioVenta = request.PrecioVenta;
-            productDomainModel.PrecioCompra = request.PrecioCompra;
-            productDomainModel.StockMinimo = request.StockMinimo;
-            productDomainModel.CodigoCategoria = request.CodigoCategoria ?? productDomainModel.CodigoCategoria;
-            productDomainModel.CodigoMedida = request.CodigoMedida ?? productDomainModel.CodigoMedida;
+            productDomainModel = _mapper.Map(updateProductoRequest, productDomainModel);
 
 
             //mapear domain model a dto de salida
-            var productoDTO = ToDto(productDomainModel);
+            var productoDTO = _mapper.Map<ProductoResponseDTO>(productDomainModel);
 
             //devolver un 200 OK con el producto actualizado
             return Ok(productoDTO);
@@ -181,20 +158,5 @@ namespace DistribuidoraApi.Controllers
 
             return Ok("Se ha eliminado el producto "+ codigoProducto + "correctamente");
         }
-
-        // Entidad → DTO de salida (provisional, hasta AutoMapper)
-        private static ProductoResponseDTO ToDto(Producto p) => new()
-        {
-            CodigoProducto = p.CodigoProducto,
-            Nombre = p.Nombre,
-            Descripcion = p.Descripcion,
-            PrecioVenta = p.PrecioVenta,
-            StockActual = p.StockActual,
-            StockMinimo = p.StockMinimo,
-            Activo = p.Activo,
-            CodigoCategoria = p.CodigoCategoria,
-            CodigoMedida = p.CodigoMedida
-        };
-
     }
 }
